@@ -1,0 +1,493 @@
+openapi: 3.0.3
+info:
+  title: Gigahost API
+  version: "0.0.1"
+
+servers:
+  - url: https://api.gigahost.no/api/v0
+
+security:
+  - bearerAuth: []
+
+paths:
+  /account:
+    get:
+      operationId: getAccount
+      responses:
+        "200":
+          description: The authenticated account profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountData'
+
+  /account/sshkey:
+    post:
+      operationId: createSSHKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSSHKeyRequest'
+      responses:
+        "200":
+          description: The SSH key was created. The client resolves it by key_data from GET /account.
+
+  /account/sshkey/{id}:
+    get:
+      operationId: getSSHKey
+      description: Logical read; the client reads GET /account and filters sshkeys by id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The SSH key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SSHKey'
+    delete:
+      operationId: deleteSSHKey
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The SSH key was deleted.
+
+  /dns/zones:
+    get:
+      operationId: listDnsZones
+      responses:
+        "200":
+          description: The account's DNS zones.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DnsZonesData'
+    post:
+      operationId: createDnsZone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateZoneRequest'
+      responses:
+        "201":
+          description: The zone was created. The client resolves it by name from GET /dns/zones.
+
+  /dns/zones/{id}:
+    get:
+      operationId: getDnsZone
+      description: Logical read; the client reads GET /dns/zones and filters by id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The DNS zone.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DnsZone'
+    delete:
+      operationId: deleteDnsZone
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The zone was deleted.
+
+  /dns/zones/{zone_id}/records:
+    get:
+      operationId: listDnsRecords
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The DNS records in the zone.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DnsRecordsData'
+    post:
+      operationId: createDnsRecord
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecordRequest'
+      responses:
+        "201":
+          description: The record was created. The client resolves it by name, type, and value from GET /dns/zones/{zone_id}/records.
+
+  /dns/zones/{zone_id}/records/{id}:
+    get:
+      operationId: getDnsRecord
+      description: Logical read; the client reads GET /dns/zones/{zone_id}/records and filters by id.
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The DNS record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DnsRecord'
+    put:
+      operationId: updateDnsRecord
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecordRequest'
+      responses:
+        "200":
+          description: The record was updated. The client re-resolves it by name, type, and value (the id changes on update).
+    delete:
+      operationId: deleteDnsRecord
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The record was deleted.
+
+  /dns/zones/{zone_id}/redirect:
+    post:
+      operationId: createDnsRedirect
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRedirectRequest'
+      responses:
+        "201":
+          description: The redirect was created. The client resolves it by source from GET /dns/zones/{zone_id}/redirect.
+
+  /dns/zones/{zone_id}/redirect/{source}:
+    get:
+      operationId: getDnsRedirect
+      description: Logical read; the client reads GET /dns/zones/{zone_id}/redirect and filters by source.
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The redirect.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DnsRedirect'
+    put:
+      operationId: updateDnsRedirect
+      description: The client sends PUT /dns/zones/{zone_id}/redirect with the source in the request body.
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRedirectRequest'
+      responses:
+        "200":
+          description: The redirect was updated.
+    delete:
+      operationId: deleteDnsRedirect
+      description: The client sends DELETE /dns/zones/{zone_id}/redirect with the source as a query parameter.
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The redirect was deleted.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    AccountData:
+      type: object
+      properties:
+        cust_id:
+          type: string
+          description: Customer id.
+        cust_name:
+          type: string
+          description: Customer (company or person) name.
+        cust_address:
+          type: string
+          description: Postal address.
+        cust_zipcode:
+          type: string
+          description: Postal/ZIP code.
+        cust_city:
+          type: string
+          description: City.
+        cust_country:
+          type: string
+          description: Country.
+        cust_phone:
+          type: string
+          description: Phone number.
+        cust_email:
+          type: string
+          description: Primary contact email.
+        cust_company_no:
+          type: string
+          description: Organization/company number.
+        cust_billing_email:
+          type: string
+          description: Billing email.
+        ssh_keys:
+          type: array
+          description: SSH public keys registered on the account.
+          items:
+            $ref: '#/components/schemas/SSHKey'
+
+    SSHKey:
+      type: object
+      properties:
+        key_id:
+          type: string
+          description: SSH key id.
+        key_name:
+          type: string
+          description: SSH key name.
+        key_added:
+          type: string
+          description: When the key was added (Unix timestamp, string-encoded).
+        key_data:
+          type: string
+          description: The OpenSSH public key material.
+
+    CreateSSHKeyRequest:
+      type: object
+      required:
+        - key_name
+        - key_data
+      properties:
+        key_name:
+          type: string
+          description: Label for the SSH key.
+        key_data:
+          type: string
+          description: The OpenSSH public key material.
+
+    DnsZonesData:
+      type: object
+      properties:
+        zones:
+          type: array
+          description: DNS zones on the account.
+          items:
+            $ref: '#/components/schemas/DnsZone'
+
+    DnsZone:
+      type: object
+      properties:
+        zone_id:
+          type: string
+          description: Zone id.
+        zone_name:
+          type: string
+          description: Domain name.
+        zone_type:
+          type: string
+          description: Zone type (NATIVE, MASTER, or SLAVE).
+        zone_active:
+          type: boolean
+          description: Whether the zone is active.
+        zone_protected:
+          type: boolean
+          description: Whether the zone is protected against deletion.
+        external_dns:
+          type: boolean
+          description: Whether the zone is served by external nameservers.
+
+    CreateZoneRequest:
+      type: object
+      required:
+        - zone_name
+      properties:
+        zone_name:
+          type: string
+          description: Domain name.
+        zone_type:
+          type: string
+          default: "NATIVE"
+          description: Zone type (NATIVE, MASTER, or SLAVE).
+
+    DnsRecordsData:
+      type: object
+      properties:
+        records:
+          type: array
+          description: DNS records in the zone.
+          items:
+            $ref: '#/components/schemas/DnsRecord'
+
+    DnsRecord:
+      type: object
+      properties:
+        record_id:
+          type: string
+          description: Record id.
+        record_name:
+          type: string
+          description: Record name (host), e.g. "@" or "www".
+        record_type:
+          type: string
+          description: Record type (A, AAAA, CNAME, MX, TXT, NS, etc.).
+        record_value:
+          type: string
+          description: Record value (content).
+        record_ttl:
+          type: integer
+          description: Time to live, in seconds.
+        record_priority:
+          type: integer
+          nullable: true
+          description: Priority (used by MX and SRV records).
+
+    CreateRecordRequest:
+      type: object
+      required:
+        - record_value
+      properties:
+        record_value:
+          type: string
+          description: Record value (content).
+        record_name:
+          type: string
+          default: "@"
+          description: Record name (host); defaults to "@".
+        record_type:
+          type: string
+          default: "A"
+          description: Record type; defaults to "A".
+        record_ttl:
+          type: integer
+          default: 3600
+          description: Time to live, in seconds; defaults to 3600.
+        record_priority:
+          type: integer
+          description: Priority (used by MX and SRV records).
+
+    DnsRedirect:
+      type: object
+      properties:
+        source:
+          type: string
+          description: Subdomain the redirect applies to, or "@" for the zone root.
+        target_url:
+          type: string
+          description: URL that requests are redirected to.
+        enabled:
+          type: boolean
+          description: Whether the redirect is active.
+
+    CreateRedirectRequest:
+      type: object
+      required:
+        - target_url
+      properties:
+        target_url:
+          type: string
+          description: URL that requests are redirected to.
+        source:
+          type: string
+          default: "@"
+          description: Subdomain the redirect applies to; defaults to "@" (the zone root).
