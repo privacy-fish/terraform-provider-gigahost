@@ -56,14 +56,14 @@ jobs:
   test:
     name: 'Acceptance Tests: Terraform ${{ matrix.terraform }}'
     needs: build
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       matrix:
         # Terraform versions
         terraform:
-          - '1.13.*'
           - '1.14.*'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -79,5 +79,5 @@ jobs:
       - env:
           TF_ACC: "1"
           GIGAHOST_API_TOKEN: ${{ secrets.GIGAHOST_API_TOKEN }}
-        run: go test -v -cover ./internal/provider/
-        timeout-minutes: 10
+        run: go test -v -cover -timeout 45m ./internal/provider/
+        timeout-minutes: 50

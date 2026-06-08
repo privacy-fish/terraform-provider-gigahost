@@ -38,13 +38,53 @@ func TestNewClient(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewClient: %v", err)
 		}
-		// The base path is normalized with a trailing slash so relative request
-		// paths resolve against it (the go-tfe pattern).
 		want := DefaultAddress + "/"
 		if c.baseURL.String() != want {
 			t.Errorf("baseURL = %q, want %q", c.baseURL.String(), want)
 		}
 	})
+}
+
+func TestRetryPolicyDoesNotRetryNonIdempotent(t *testing.T) {
+	var calls int
+	c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+
+	req, err := c.newRequest(context.Background(), http.MethodPost, "thing", nil, nil)
+	if err != nil {
+		t.Fatalf("newRequest: %v", err)
+	}
+	if err := c.sendRequest(req, nil); err == nil {
+		t.Fatal("expected an error from a 500 response")
+	}
+	if calls != 1 {
+		t.Errorf("POST attempted %d times, want 1 (a create must not be retried)", calls)
+	}
+}
+
+func TestRetryPolicyRetriesIdempotent(t *testing.T) {
+	var calls int
+	c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls <= defaultRetryMax {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		_, _ = io.WriteString(w, `{"meta":{"status":200},"data":null}`)
+	})
+
+	req, err := c.newRequest(context.Background(), http.MethodGet, "thing", nil, nil)
+	if err != nil {
+		t.Fatalf("newRequest: %v", err)
+	}
+	if err := c.sendRequest(req, nil); err != nil {
+		t.Fatalf("GET should succeed after retries: %v", err)
+	}
+	if calls != defaultRetryMax+1 {
+		t.Errorf("GET attempted %d times, want %d", calls, defaultRetryMax+1)
+	}
 }
 
 func TestGetAccount(t *testing.T) {
@@ -167,7 +207,6 @@ func TestCreateRecordResolve(t *testing.T) {
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			// Create returns meta-only; the client resolves from the list.
 			_, _ = io.WriteString(w, `{"meta": {"status": 201}, "data": []}`)
 		default:
 			_, _ = io.WriteString(w, `{"meta": {"status": 200}, "data": [{"record_id": "r1", "record_name": "www", "record_type": "A", "record_value": "1.2.3.4", "record_ttl": 3600}]}`)
