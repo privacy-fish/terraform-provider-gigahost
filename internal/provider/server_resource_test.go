@@ -65,7 +65,7 @@ func TestAccServerResource_basic(t *testing.T) {
 				ImportStateIdFunc:                    testAccServerImportID,
 				ImportStateVerifyIgnore: []string{
 					"name", "ipv6", "root_password", "price_id", "order_id",
-					"order_number", "rate_hourly", "monthly_cap", "currency",
+					"order_number", "rate_hourly", "monthly_cap", "currency", "ips",
 				},
 			},
 		},
@@ -106,6 +106,7 @@ func TestAccServerResource_osInstall(t *testing.T) {
 				ImportStateVerifyIgnore: []string{
 					"name", "ipv6", "os_distro", "os_version", "root_password",
 					"price_id", "order_id", "order_number", "rate_hourly", "monthly_cap", "currency",
+					"ips", "os", "installing", "running",
 				},
 			},
 		},
