@@ -101,8 +101,9 @@ func (d *serverDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 			},
 			"srv_hostname": schema.StringAttribute{
 				Computed:            true,
-				Description:         "Server hostname.",
-				MarkdownDescription: "Server hostname.",
+				DeprecationMessage:  "Not populated by the API; use srv_name instead.",
+				Description:         "Server hostname; not populated by the API.",
+				MarkdownDescription: "Server hostname; not populated by the API.",
 			},
 			"srv_status": schema.BoolAttribute{
 				Computed:            true,

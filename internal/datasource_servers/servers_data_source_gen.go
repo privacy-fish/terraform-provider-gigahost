@@ -167,8 +167,9 @@ func ServersDataSourceSchema(ctx context.Context) schema.Schema {
 						},
 						"srv_hostname": schema.StringAttribute{
 							Computed:            true,
-							Description:         "Server hostname.",
-							MarkdownDescription: "Server hostname.",
+							Description:         "Server hostname; not populated by the API.",
+							MarkdownDescription: "Server hostname; not populated by the API.",
+							DeprecationMessage:  "This attribute is deprecated.",
 						},
 						"srv_id": schema.StringAttribute{
 							Computed:            true,
@@ -182,8 +183,8 @@ func ServersDataSourceSchema(ctx context.Context) schema.Schema {
 						},
 						"srv_name": schema.StringAttribute{
 							Computed:            true,
-							Description:         "Server name (FQDN).",
-							MarkdownDescription: "Server name (FQDN).",
+							Description:         "Server name. Initially the requested deploy hostname, or auto-generated.",
+							MarkdownDescription: "Server name. Initially the requested deploy hostname, or auto-generated.",
 						},
 						"srv_primary_ip": schema.StringAttribute{
 							Computed:            true,

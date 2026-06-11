@@ -1,3 +1,18 @@
+## 0.3.2 (June 11, 2026)
+
+DEPRECATIONS:
+
+* `gigahost_server` and `gigahost_servers` data sources - `srv_hostname` is deprecated: the API does not populate it (the requested deploy hostname is recorded in `srv_name`).
+
+BUG FIXES:
+
+* `gigahost_server` - a transient gap in the server list no longer removes a live server from state: absence is confirmed across repeated reads before the resource is treated as deleted.
+* `gigahost_server` - destroying a server that died during provisioning no longer fails forever: the API refuses cancellation of nonexistent servers with a 400, so a refused cancellation is followed by an absence check, and a confirmed-gone server is cleared from state with a warning naming the order.
+
+ENHANCEMENTS:
+
+* `gigahost_server` - document that a requested `hostname` is recorded as the server name (`srv_name`, replaced by `name` when both are set) and is not separately readable; the server data sources' `srv_name`/`srv_hostname` descriptions now reflect this.
+
 ## 0.3.1 (June 11, 2026)
 
 BUG FIXES:

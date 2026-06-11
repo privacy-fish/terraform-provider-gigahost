@@ -38,26 +38,30 @@ resource "gigahost_server" "example" {
 }
 ```
 
-### With SSH keys and backups
+### With SSH keys, backups and a create timeout
+
+The create wait covers the whole deployment, including the OS install — bare-metal
+installs can exceed the default 30-minute create timeout, so raise it for dedicated
+servers. A `ready` server may still be finishing its first boot, so retry SSH
+connections.
 
 ```terraform
-# A VM with an SSH key, daily backups, and a longer create timeout.
+# A dedicated (bare metal) server with an SSH key, daily backups, and a
+# longer create timeout for the slower hardware install.
 resource "gigahost_ssh_key" "example" {
   key_name = "deploy"
   key_data = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID... user@example.com"
 }
 
 resource "gigahost_server" "example" {
-  product_name = "KVM Performance VPS 8GB"
+  product_name = "Intro - Intel Core i3 4GB"
   region       = "Sandefjord"
   os_distro    = "Ubuntu"
   os_version   = "24.04"
   backups      = true
   ssh_keys     = [gigahost_ssh_key.example.key_id]
 
-  timeouts {
-    create = "45m"
-  }
+  timeouts = { create = "60m" }
 }
 ```
 
@@ -72,8 +76,8 @@ resource "gigahost_server" "example" {
 ### Optional
 
 - `backups` (Boolean) Whether to enable daily backups (adds 25% to the price).
-- `hostname` (String) Requested hostname.
-- `name` (String) Descriptive name for the server.
+- `hostname` (String) Requested hostname. Stored by the API as the server's initial name (`srv_name`); unset after import.
+- `name` (String) Descriptive name for the server. When unset, the server keeps its initial name.
 - `os_distro` (String) OS distribution to install, e.g. "Ubuntu". Provide os_distro + os_version, or rescue.
 - `os_version` (String) OS version to install, e.g. "24.04" (matches the OS name or release codename).
 - `rescue` (Boolean) Boot the server into rescue mode instead of installing an OS.
@@ -146,8 +150,8 @@ Import is supported using the following syntax:
 terraform import gigahost_server.example 12345
 ```
 
-Deploy-time attributes the API does not return (`ssh_keys`, `root_password`, `ipv6`
-when the server list does not expose it, and the order/pricing details) are unset
-after import. Because `ssh_keys` requires replacement
+Deploy-time attributes the API does not return (`ssh_keys`, `root_password`,
+`hostname`, `ipv6` when the server list does not expose it, and the order/pricing
+details) are unset after import. Because `ssh_keys` requires replacement
 when it changes, declaring it for an imported server plans a destroy/recreate — omit
 it, or add `lifecycle { ignore_changes = [ssh_keys] }`.

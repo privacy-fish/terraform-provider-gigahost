@@ -35,7 +35,7 @@ data "gigahost_server" "example" {
 - `os_id` (String) Installed OS image (version) id.
 - `product_id` (String) Product id.
 - `srv_cores` (Number) Number of CPU cores.
-- `srv_hostname` (String) Server hostname.
+- `srv_hostname` (String, Deprecated) Server hostname; not populated by the API.
 - `srv_location` (String) Datacenter location code.
 - `srv_primary_ip` (String) Primary IPv4 address.
 - `srv_ram` (Number) Memory, in GB.

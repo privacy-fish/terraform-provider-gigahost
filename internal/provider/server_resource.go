@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -31,8 +30,11 @@ import (
 
 const serverDeployTimeout = 30 * time.Minute
 
-// Variable so tests can poll fast.
-var serverDeployPollInterval = 5 * time.Second
+// Variables so tests can poll fast.
+var (
+	serverDeployPollInterval = 5 * time.Second
+	serverListConfirmDelay   = 15 * time.Second
+)
 
 var (
 	_ resource.Resource                     = &serverResource{}
@@ -128,8 +130,8 @@ func (r *serverResource) Schema(ctx context.Context, _ resource.SchemaRequest, r
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Optional:            true,
-				Description:         "Descriptive name for the server.",
-				MarkdownDescription: "Descriptive name for the server.",
+				Description:         "Descriptive name for the server. When unset, the server keeps its initial name.",
+				MarkdownDescription: "Descriptive name for the server. When unset, the server keeps its initial name.",
 			},
 			"product_name": schema.StringAttribute{
 				Required:            true,
@@ -161,8 +163,8 @@ func (r *serverResource) Schema(ctx context.Context, _ resource.SchemaRequest, r
 			},
 			"hostname": schema.StringAttribute{
 				Optional:            true,
-				Description:         "Requested hostname.",
-				MarkdownDescription: "Requested hostname.",
+				Description:         "Requested hostname. Stored by the API as the server's initial name (srv_name); unset after import.",
+				MarkdownDescription: "Requested hostname. Stored by the API as the server's initial name (`srv_name`); unset after import.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"ssh_keys": schema.SetAttribute{
@@ -563,7 +565,7 @@ func (r *serverResource) Create(ctx context.Context, req resource.CreateRequest,
 		if state.ServerId.IsNull() {
 			hint = fmt.Sprintf("No server id was observed for %s, so terraform destroy cannot cancel it; check the Gigahost control panel and cancel it manually if needed.", orderRef(&state))
 		} else {
-			hint = fmt.Sprintf("The server was saved to Terraform state and marked tainted; terraform destroy will cancel %s. The API can refuse cancellation while the server is provisioning — retry the destroy if it does.", orderRef(&state))
+			hint = fmt.Sprintf("The server was saved to Terraform state and marked tainted; terraform destroy will cancel %s, or clear the resource if the server no longer exists.", orderRef(&state))
 		}
 		resp.Diagnostics.AddError("Unable to Deploy Gigahost Server", fmt.Sprintf("%s\n\n%s", err, hint))
 		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -735,6 +737,32 @@ func (r *serverResource) waitForServer(ctx context.Context, orderID int64) (*dep
 	}
 }
 
+// findServerByID looks the server up in the server list, re-reading the list
+// before concluding absence: the API can transiently omit a live server for
+// tens of seconds (observed live), so absence is only trusted after a minute.
+func (r *serverResource) findServerByID(ctx context.Context, id string) (*client.Server, error) {
+	const confirmReads = 5
+	for attempt := 1; ; attempt++ {
+		servers, err := r.client.ListServers(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for i := range servers {
+			if equalID(servers[i].SrvID, id) {
+				return &servers[i], nil
+			}
+		}
+		if attempt >= confirmReads {
+			return nil, nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(serverListConfirmDelay):
+		}
+	}
+}
+
 func (r *serverResource) findServerByOrder(ctx context.Context, orderID int64) *client.Server {
 	servers, err := r.client.ListServers(ctx)
 	if err != nil {
@@ -844,14 +872,13 @@ func (r *serverResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	servers, err := r.client.ListServers(ctx)
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to Read Gigahost Server", err.Error())
-		return
-	}
-
 	var found *client.Server
 	if state.ServerId.IsNull() {
+		servers, err := r.client.ListServers(ctx)
+		if err != nil {
+			resp.Diagnostics.AddError("Unable to Read Gigahost Server", err.Error())
+			return
+		}
 		// A partially created server has no id in state yet; adopt it by its
 		// deployment order once it appears, and never treat it as deleted.
 		if !state.OrderId.IsNull() {
@@ -873,11 +900,11 @@ func (r *serverResource) Read(ctx context.Context, req resource.ReadRequest, res
 			return
 		}
 	} else {
-		for i := range servers {
-			if equalID(servers[i].SrvID, state.ServerId.ValueString()) {
-				found = &servers[i]
-				break
-			}
+		var err error
+		found, err = r.findServerByID(ctx, state.ServerId.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Unable to Read Gigahost Server", err.Error())
+			return
 		}
 	}
 	if found == nil || strings.EqualFold(found.Order.OrderStatus, "cancelled") {
@@ -964,12 +991,19 @@ func (r *serverResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	}
 
 	if err := r.client.CancelServer(ctx, state.ServerId.ValueString()); err != nil && !errors.Is(err, client.ErrNotFound) {
-		detail := err.Error()
-		var apiErr *client.Error
-		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusBadRequest {
-			detail = fmt.Sprintf("%s\n\nThe API can refuse cancellation while the server is provisioning. Retry the destroy once the server is running, or cancel %s in the Gigahost control panel.", err, orderRef(&state))
+		// Cancelling a nonexistent server returns 400 rather than 404, so a
+		// refusal is followed by an absence check before it counts as fatal.
+		if srv, findErr := r.findServerByID(ctx, state.ServerId.ValueString()); findErr == nil && srv == nil {
+			resp.Diagnostics.AddWarning(
+				"Gigahost Server Already Gone",
+				fmt.Sprintf("The server no longer exists, so the cancellation was refused (%s). Verify in the Gigahost control panel that %s is not active.", err, orderRef(&state)),
+			)
+			return
 		}
-		resp.Diagnostics.AddError("Unable to Cancel Gigahost Server", detail)
+		resp.Diagnostics.AddError(
+			"Unable to Cancel Gigahost Server",
+			fmt.Sprintf("%s\n\nRetry the destroy, or cancel %s in the Gigahost control panel.", err, orderRef(&state)),
+		)
 	}
 }
 

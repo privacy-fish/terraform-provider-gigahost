@@ -582,7 +582,8 @@
 										"name": "srv_hostname",
 										"string": {
 											"computed_optional_required": "computed",
-											"description": "Server hostname."
+											"deprecation_message": "This attribute is deprecated.",
+											"description": "Server hostname; not populated by the API."
 										}
 									},
 									{
@@ -603,7 +604,7 @@
 										"name": "srv_name",
 										"string": {
 											"computed_optional_required": "computed",
-											"description": "Server name (FQDN)."
+											"description": "Server name. Initially the requested deploy hostname, or auto-generated."
 										}
 									},
 									{
