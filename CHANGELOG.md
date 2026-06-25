@@ -3,6 +3,7 @@
 FEATURES:
 
 * `gigahost_server_ip_reverse` - add a resource for managing PTR/reverse DNS on a server IP address.
+* `gigahost_server_routed_layer3_ipv4` orders routed layer 3 IPv4 addresses and moves them between servers.
 
 BUG FIXES:
 
