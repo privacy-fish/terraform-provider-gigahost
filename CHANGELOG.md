@@ -2,7 +2,7 @@
 
 FEATURES:
 
-* **New Resource:** `gigahost_server_routed_layer3_ipv4` orders routed layer 3 IPv4 addresses and moves them between servers.
+* **New Resource:** `gigahost_server_ipv4` orders extra layer 2 or layer 3 IPv4 addresses and moves layer 3 IPv4 addresses between servers.
 
 BUG FIXES:
 
