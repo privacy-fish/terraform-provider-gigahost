@@ -14,7 +14,7 @@ type updateServerReverseRequest struct {
 	V4V6 string `json:"v4v6"`
 }
 
-func (c *Client) UpdateServerIPReverse(ctx context.Context, srvID string, ipID int64, v4v6 string, dns string) error {
+func (c *Client) UpdateServerReverse(ctx context.Context, srvID string, ipID int64, v4v6 string, dns string) error {
 	if _, err := strconv.ParseInt(srvID, 10, 64); err != nil {
 		return fmt.Errorf("gigahost: invalid srv id %q", srvID)
 	}

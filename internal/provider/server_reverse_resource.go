@@ -7,32 +7,34 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/pigeon-as/terraform-provider-gigahost/internal/client"
 )
 
 var (
-	_ resource.Resource                = &serverIPReverseResource{}
-	_ resource.ResourceWithConfigure   = &serverIPReverseResource{}
-	_ resource.ResourceWithImportState = &serverIPReverseResource{}
+	_ resource.Resource                = &serverReverseResource{}
+	_ resource.ResourceWithConfigure   = &serverReverseResource{}
+	_ resource.ResourceWithImportState = &serverReverseResource{}
 )
 
-func NewServerIPReverseResource() resource.Resource {
-	return &serverIPReverseResource{}
+func NewServerReverseResource() resource.Resource {
+	return &serverReverseResource{}
 }
 
-type serverIPReverseResource struct {
+type serverReverseResource struct {
 	client *client.Client
 }
 
-type serverIPReverseResourceModel struct {
+type serverReverseResourceModel struct {
 	SrvID     types.String `tfsdk:"srv_id"`
 	IPID      types.Int64  `tfsdk:"ip_id"`
 	IPv4v6    types.String `tfsdk:"ip_v4v6"`
@@ -41,13 +43,13 @@ type serverIPReverseResourceModel struct {
 	IPReverse types.String `tfsdk:"ip_reverse"`
 }
 
-func (r *serverIPReverseResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_server_ip_reverse"
+func (r *serverReverseResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_server_reverse"
 }
 
-func (r *serverIPReverseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *serverReverseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages reverse DNS (PTR) for a Gigahost server IP address.",
+		MarkdownDescription: "Manages reverse DNS (PTR) for a Gigahost server address.",
 		Attributes: map[string]schema.Attribute{
 			"srv_id": schema.StringAttribute{
 				Required:            true,
@@ -66,6 +68,7 @@ func (r *serverIPReverseResource) Schema(_ context.Context, _ resource.SchemaReq
 				Description:         "IP version for the address. Valid values are `ipv4` and `ipv6`.",
 				MarkdownDescription: "IP version for the address. Valid values are `ipv4` and `ipv6`.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{stringvalidator.OneOf("ipv4", "ipv6")},
 			},
 			"ip_reverse": schema.StringAttribute{
 				Required:            true,
@@ -86,7 +89,7 @@ func (r *serverIPReverseResource) Schema(_ context.Context, _ resource.SchemaReq
 	}
 }
 
-func (r *serverIPReverseResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *serverReverseResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -103,67 +106,67 @@ func (r *serverIPReverseResource) Configure(_ context.Context, req resource.Conf
 	r.client = c
 }
 
-func (r *serverIPReverseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan serverIPReverseResourceModel
+func (r *serverReverseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan serverReverseResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	if err := r.updateReverse(ctx, &plan); err != nil {
-		resp.Diagnostics.AddError("Unable to Update Gigahost Server IP Reverse DNS", err.Error())
+		resp.Diagnostics.AddError("Unable to Update Gigahost Server Reverse DNS", err.Error())
 		return
 	}
 
-	state, err := r.readState(ctx, &plan)
+	state, err := r.readState(ctx, &plan, false)
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to Read Gigahost Server IP Reverse DNS", err.Error())
+		resp.Diagnostics.AddError("Unable to Read Gigahost Server Reverse DNS", err.Error())
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
-func (r *serverIPReverseResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state serverIPReverseResourceModel
+func (r *serverReverseResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state serverReverseResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	newState, err := r.readState(ctx, &state)
+	newState, err := r.readState(ctx, &state, true)
 	if err != nil {
 		if errors.Is(err, client.ErrNotFound) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Unable to Read Gigahost Server IP Reverse DNS", err.Error())
+		resp.Diagnostics.AddError("Unable to Read Gigahost Server Reverse DNS", err.Error())
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
 }
 
-func (r *serverIPReverseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan serverIPReverseResourceModel
+func (r *serverReverseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan serverReverseResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	if err := r.updateReverse(ctx, &plan); err != nil {
-		resp.Diagnostics.AddError("Unable to Update Gigahost Server IP Reverse DNS", err.Error())
+		resp.Diagnostics.AddError("Unable to Update Gigahost Server Reverse DNS", err.Error())
 		return
 	}
 
-	state, err := r.readState(ctx, &plan)
+	state, err := r.readState(ctx, &plan, false)
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to Read Gigahost Server IP Reverse DNS After Update", err.Error())
+		resp.Diagnostics.AddError("Unable to Read Gigahost Server Reverse DNS After Update", err.Error())
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
-func (r *serverIPReverseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state serverIPReverseResourceModel
+func (r *serverReverseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state serverReverseResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -171,41 +174,50 @@ func (r *serverIPReverseResource) Delete(ctx context.Context, req resource.Delet
 
 	state.IPReverse = types.StringValue("")
 	if err := r.updateReverse(ctx, &state); err != nil && !errors.Is(err, client.ErrNotFound) {
-		resp.Diagnostics.AddError("Unable to Clear Gigahost Server IP Reverse DNS", err.Error())
+		resp.Diagnostics.AddError("Unable to Clear Gigahost Server Reverse DNS", err.Error())
 	}
 }
 
-func (r *serverIPReverseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	serverID, rest, ok := strings.Cut(req.ID, "/")
-	if !ok {
-		resp.Diagnostics.AddError("Invalid Import Id", fmt.Sprintf("Expected import id in the format \"srv_id/ip_v4v6/ip_id\", got: %q.", req.ID))
-		return
-	}
-	v4v6, ipID, ok := strings.Cut(rest, "/")
-	if !ok || serverID == "" || v4v6 == "" || ipID == "" {
-		resp.Diagnostics.AddError("Invalid Import Id", fmt.Sprintf("Expected import id in the format \"srv_id/ip_v4v6/ip_id\", got: %q.", req.ID))
-		return
-	}
-	parsedIPID, err := strconv.ParseInt(ipID, 10, 64)
+func (r *serverReverseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	serverID, v4v6, ipID, err := parseServerReverseImportID(req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Invalid Import Id", fmt.Sprintf("IP id %q is not numeric: %v.", ipID, err))
+		resp.Diagnostics.AddError("Invalid Import Id", fmt.Sprintf("Expected import id in the format \"srv_id/ip_v4v6/ip_id\", got: %q.", req.ID))
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("srv_id"), serverID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("ip_v4v6"), v4v6)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("ip_id"), parsedIPID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("ip_id"), ipID)...)
 }
 
-func (r *serverIPReverseResource) updateReverse(ctx context.Context, state *serverIPReverseResourceModel) error {
+func parseServerReverseImportID(id string) (string, string, int64, error) {
+	serverID, rest, ok := strings.Cut(id, "/")
+	if !ok {
+		return "", "", 0, fmt.Errorf("invalid import id %q", id)
+	}
+	v4v6, ipID, ok := strings.Cut(rest, "/")
+	if !ok || serverID == "" || v4v6 == "" || ipID == "" {
+		return "", "", 0, fmt.Errorf("invalid import id %q", id)
+	}
+	if v4v6 != "ipv4" && v4v6 != "ipv6" {
+		return "", "", 0, fmt.Errorf("invalid IP version %q", v4v6)
+	}
+	parsedIPID, err := strconv.ParseInt(ipID, 10, 64)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("ip id %q is not numeric: %w", ipID, err)
+	}
+	return serverID, v4v6, parsedIPID, nil
+}
+
+func (r *serverReverseResource) updateReverse(ctx context.Context, state *serverReverseResourceModel) error {
 	v4v6 := state.IPv4v6.ValueString()
 	if v4v6 != "ipv4" && v4v6 != "ipv6" {
 		return fmt.Errorf("gigahost: invalid IP version %q", v4v6)
 	}
-	return r.client.UpdateServerIPReverse(ctx, state.SrvID.ValueString(), state.IPID.ValueInt64(), v4v6, state.IPReverse.ValueString())
+	return r.client.UpdateServerReverse(ctx, state.SrvID.ValueString(), state.IPID.ValueInt64(), v4v6, state.IPReverse.ValueString())
 }
 
-func (r *serverIPReverseResource) readState(ctx context.Context, state *serverIPReverseResourceModel) (*serverIPReverseResourceModel, error) {
+func (r *serverReverseResource) readState(ctx context.Context, state *serverReverseResourceModel, useAPIReverse bool) (*serverReverseResourceModel, error) {
 	server, err := r.client.GetServer(ctx, state.SrvID.ValueString())
 	if err != nil {
 		return nil, err
@@ -216,11 +228,20 @@ func (r *serverIPReverseResource) readState(ctx context.Context, state *serverIP
 		return nil, client.ErrNotFound
 	}
 
+	newState := serverReverseStateFromIP(state, *ip, useAPIReverse)
+	return &newState, nil
+}
+
+func serverReverseStateFromIP(state *serverReverseResourceModel, ip client.ServerIP, useAPIReverse bool) serverReverseResourceModel {
 	newState := *state
 	newState.IPAddress = types.StringValue(ip.IPAddress)
 	newState.IPType = types.StringValue(ip.IPType)
-	newState.IPReverse = types.StringValue(ip.IPReverse)
-	return &newState, nil
+	if useAPIReverse && ip.IPReverse != "" {
+		newState.IPReverse = types.StringValue(ip.IPReverse)
+	} else if newState.IPReverse.IsNull() || newState.IPReverse.IsUnknown() {
+		newState.IPReverse = types.StringValue("")
+	}
+	return newState
 }
 
 func findServerIP(ips []client.ServerIP, ipID int64, v4v6 string) *client.ServerIP {

@@ -2,7 +2,7 @@
 
 FEATURES:
 
-* `gigahost_server_ip_reverse` - add a resource for managing PTR/reverse DNS on a server IP address.
+* `gigahost_server_reverse` - add a resource for managing PTR/reverse DNS on a server address.
 
 BUG FIXES:
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestUpdateServerIPReverse(t *testing.T) {
+func TestUpdateServerReverse(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		v4v6 string
@@ -31,8 +31,8 @@ func TestUpdateServerIPReverse(t *testing.T) {
 				_, _ = io.WriteString(w, `{"meta":{"status":200,"message":"Reverse updated."},"data":{}}`)
 			})
 
-			if err := c.UpdateServerIPReverse(context.Background(), "1001", 2002, tc.v4v6, "server.example.com"); err != nil {
-				t.Fatalf("UpdateServerIPReverse: %v", err)
+			if err := c.UpdateServerReverse(context.Background(), "1001", 2002, tc.v4v6, "server.example.com"); err != nil {
+				t.Fatalf("UpdateServerReverse: %v", err)
 			}
 		})
 	}
